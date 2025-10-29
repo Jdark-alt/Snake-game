@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Devesh's Snake Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS styles will be in part 2 -->
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="game-title">Snake Bash!</h1>
+            <button class="info-button" id="infoButton">i</button>
+        </div>
+        
+        <div class="game-board">
+            <canvas id="gameCanvas"></canvas>
+            
+            <div class="lobby" id="lobbyScreen">
+                <div class="lobby-container">
+                    <h2>Game Lobby</h2>
+                    <p>Select your snake color:</p>
+                    <div class="color-selection" id="colorSelection">
+                        <!-- Colors will be added dynamically -->
+                    </div>
+                    <div id="waitingPlayers"></div>
+                    <button class="ready-button" id="readyButton" disabled>Ready to Play</button>
+                    <p class="waiting-text" id="waitingText">Waiting for other players...</p>
+                </div>
+            </div>
+            
+            <div class="game-over" id="gameOverScreen" style="display: none;">
+                <div class="game-over-container">
+                    <h2>Game Over</h2>
+                    <p id="winnerText">Winner: Blue Snake</p>
+                    <button class="ready-button" id="restartButton">Play Again</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="snake-info" id="snakeInfo">
+            <!-- Player info will be added dynamically -->
+        </div>
+        
+        <div class="mobile-controls">
+            <div class="fire-button" id="mobileFireButton">FIRE</div>
+            <div class="d-pad" id="dPad">
+                <div></div>
+                <button class="control-button" id="upButton">↑</button>
+                <div></div>
+                <button class="control-button" id="leftButton">←</button>
+                <div></div>
+                <button class="control-button" id="rightButton">→</button>
+                <div></div>
+                <button class="control-button" id="downButton">↓</button>
+                <div></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="info-modal" id="infoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>How to Play</h2>
+                <button class="close-modal" id="closeModal">×</button>
+            </div>
+            <div>
+                <h3>Controls:</h3>
+                <p>PC: Arrow keys or WASD to move, X or Space to fire bullet</p>
+                <p>Mobile: Touch controls at bottom of screen</p>
+                
+                <h3>Game Rules:</h3>
+                <p>- Last snake standing wins</p>
+                <p>- If a snake collides with another snake, it loses a life</p>
+                <p>- When all lives are lost, the snake is eliminated</p>
+                
+                <h3>Special Food:</h3>
+                <div class="food-info">
+                    <div class="food-item">
+                        <div class="food-icon golden-food"></div>
+                        <span>Yellow: Grow snake by 5 segments</span>
+                    </div>
+                    <div class="food-item">
+                        <div class="food-icon green-food"></div>
+                        <span>Green: Shrink snake and 4x speed boost for 5 seconds</span>
+                    </div>
+                    <div class="food-item">
+                        <div class="food-icon red-food"></div>
+                        <span>Red: Extra life (up to 5)</span>
+                    </div>
+                    <div class="food-item">
+                        <div class="food-icon white-food"></div>
+                        <span>White: Bullet that can take away 1 life</span>
+                    </div>
+                    <div class="food-item">
+                        <div class="food-icon venom-food"></div>
+                        <span>Cyan: Venom ability for 15 seconds</span>
+                    </div>
+                    <div class="food-item">
+                      <div class="food-icon venom-food"></div>
+                      <span>Cyan: Venom ability for 15 seconds + Venom Bullet capability</span>
+                    </div>
+                </div>
+                
+                <h3>Special Features:</h3>
+                <p>- Portals: Transport to another location on the map</p>
+                <p>- Venom: Makes your snake deadly to others on contact</p>
+                <p>- Venom Bullet: Fire while venomous to shoot a powerful bullet that instantly eliminates targets</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- JavaScript will be in parts 3 and 4 -->
+</body>
+</html>
+
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+        background-color: #1a1a2e;
+        color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        touch-action: manipulation;
+        padding: 20px;
+        overflow: hidden;
+    }
+
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 600px;
+        width: 100%;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 15px;
+    }
+
+    .game-title {
+        font-size: 1.8rem;
+        color: #4cc9f0;
+        margin-right: auto;
+    }
+
+    .info-button {
+        background-color: #4361ee;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: background-color 0.3s;
+    }
+
+    .info-button:hover {
+        background-color: #3a56d4;
+    }
+
+    .game-board {
+        position: relative;
+        border: 2px solid #4cc9f0;
+        border-radius: 8px;
+        overflow: hidden;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        max-height: 500px;
+        max-width: 500px;
+        background-color: #121225;
+    }
+
+    #gameCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .info-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 100;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .modal-content {
+        background-color: #1a1a2e;
+        border-radius: 10px;
+        padding: 20px;
+        max-width: 500px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        border: 2px solid #4cc9f0;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #4cc9f0;
+    }
+
+    .close-modal {
+        background: none;
+        border: none;
+        color: #ffffff;
+        font-size: 24px;
+        cursor: pointer;
+    }
+
+    .food-info {
+        margin-bottom: 20px;
+    }
+
+    .food-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .food-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .golden-food { background-color: #ffd700; }
+    .green-food { background-color: #00ff7f; }
+    .red-food { background-color: #ff4d4d; }
+    .white-food { background-color: #ffffff; }
+    .venom-food { background-color: #00ffff; }
+
+    .lobby, .game-over {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(26, 26, 46, 0.95);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-radius: 8px;
+        z-index: 10;
+    }
+
+    .lobby-container, .game-over-container {
+        background-color: #222240;
+        padding: 25px;
+        border-radius: 10px;
+        text-align: center;
+        max-width: 90%;
+        width: 350px;
+        border: 2px solid #4cc9f0;
+    }
+
+    h2 {
+        color: #4cc9f0;
+        margin-bottom: 20px;
+    }
+
+    .color-selection {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin: 15px 0;
+        gap: 10px;
+    }
+
+    .color-option {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .color-option:hover, .color-option.selected {
+        transform: scale(1.1);
+        border-color: white;
+    }
+
+    /* Direct color classes */
+    .blue { background-color: #0074D9; }
+    .purple { background-color: #B10DC9; }
+    .orange { background-color: #FF851B; }
+    .pink { background-color: #F012BE; }
+    .cyan { background-color: #39CCCC; }
+    .magenta { background-color: #F92672; }
+    .lime { background-color: #01FF70; }
+    .indigo { background-color: #4B0082; }
+
+    .ready-button {
+        background-color: #4cc9f0;
+        color: #1a1a2e;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 15px;
+        transition: background-color 0.3s;
+    }
+
+    .ready-button:hover, .ready-button:active {
+        background-color: #3a96f0;
+    }
+
+    .ready-button:disabled {
+        background-color: #3a3a5a;
+        cursor: not-allowed;
+        color: #888;
+    }
+
+    .waiting-text {
+        margin-top: 15px;
+        color: #4cc9f0;
+    }
+
+    .controls {
+        display: none;
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    .d-pad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 5px;
+        width: 150px;
+        height: 150px;
+    }
+
+    .control-button {
+        background-color: #2a2a4e;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        cursor: pointer;
+        user-select: none;
+        touch-action: manipulation;
+    }
+
+    .control-button:active {
+        background-color: #4cc9f0;
+    }
+
+    .mobile-controls {
+        display: none;
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 20px;
+    }
+
+    .fire-button {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: #ff4d4d;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-weight: bold;
+        user-select: none;
+        touch-action: manipulation;
+    }
+
+    .fire-button:active {
+        background-color: #ff2525;
+    }
+
+    .portal {
+        border: 3px solid #7b2cbf;
+        animation: portalPulse 2s infinite;
+    }
+
+    @keyframes portalPulse {
+        0% { box-shadow: 0 0 5px 0 #7b2cbf; }
+        50% { box-shadow: 0 0 15px 2px #7b2cbf; }
+        100% { box-shadow: 0 0 5px 0 #7b2cbf; }
+    }
+
+    .venom-effect {
+        box-shadow: 0 0 10px 2px cyan;
+        animation: venomPulse 1s infinite;
+    }
+
+    @keyframes venomPulse {
+        0% { box-shadow: 0 0 5px 0 cyan; }
+        50% { box-shadow: 0 0 15px 2px cyan; }
+        100% { box-shadow: 0 0 5px 0 cyan; }
+    }
+
+    .snake-info {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 15px;
+        width: 100%;
+    }
+
+    .player-info {
+        display: flex;
+        align-items: center;
+        background-color: #222240;
+        padding: 5px 10px;
+        border-radius: 5px;
+    }
+
+    .player-color {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+
+    .lives-container {
+        display: flex;
+        margin-left: 8px;
+    }
+
+    .life-icon {
+        color: #ff4d4d;
+        margin-left: 2px;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    @media (max-width: 768px) {
+        .container {
+            max-width: 100%;
+        }
+        
+        .game-board {
+            height: auto;
+            max-height: 70vh;
+        }
+        
+        .mobile-controls {
+            display: flex;
+        }
+        
+        body {
+            padding: 10px;
+        }
+    }
+</style>
+
+
+<script>
+    // Connect to the server
+    const socket = io();
+    
+    // Game elements
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const lobbyScreen = document.getElementById('lobbyScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const colorSelection = document.getElementById('colorSelection');
+    const readyButton = document.getElementById('readyButton');
+    const waitingText = document.getElementById('waitingText');
+    const waitingPlayers = document.getElementById('waitingPlayers');
+    const winnerText = document.getElementById('winnerText');
+    const restartButton = document.getElementById('restartButton');
+    const snakeInfo = document.getElementById('snakeInfo');
+    const infoButton = document.getElementById('infoButton');
+    const infoModal = document.getElementById('infoModal');
+    const closeModal = document.getElementById('closeModal');
+    
+    // Mobile control elements
+    const mobileControls = document.querySelector('.mobile-controls');
+    const upButton = document.getElementById('upButton');
+    const downButton = document.getElementById('downButton');
+    const leftButton = document.getElementById('leftButton');
+    const rightButton = document.getElementById('rightButton');
+    const mobileFireButton = document.getElementById('mobileFireButton');
+    
+    // Game state variables
+    let gridSize = 500;
+    let cellSize = 10;
+    let selectedColor = null;
+    let gameInProgress = false;
+    let portals = [];
+    let food = {
+        golden: [],
+        green: [],
+        red: [],
+        white: [],
+        venom: []
+    };
+    let snakes = {};
+    let lastFrameTime = 0;
+    let canvasScale = 1;
+    let isMobile = window.innerWidth <= 768;
+    
+    // Initialize the game
+    function initGame() {
+        console.log('Initializing game...');
+        
+        // Set canvas resolution to match grid size
+        canvas.width = gridSize;
+        canvas.height = gridSize;
+        
+        // Setup event listeners
+        setupEventListeners();
+        
+        // Show controls for mobile
+        updateMobileDisplay();
+        
+        // Start animation loop
+        requestAnimationFrame(gameLoop);
+        
+        console.log('Game initialized with grid size:', gridSize);
+    }
+    
+    // Handle animation frame updates
+    function gameLoop(timestamp) {
+        // Calculate delta time for smooth animations
+        if (!lastFrameTime) lastFrameTime = timestamp;
+        const deltaTime = timestamp - lastFrameTime;
+        lastFrameTime = timestamp;
+        
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw grid (subtle background)
+        drawGrid();
+        
+        // Draw game elements
+        drawPortals(deltaTime);
+        drawFood(deltaTime);
+        drawSnakes();
+        
+        // Continue animation loop
+        requestAnimationFrame(gameLoop);
+    }
+    
+    // Setup event listeners
+    function setupEventListeners() {
+        // Ready button
+        readyButton.addEventListener('click', function() {
+            socket.emit('readyToPlay');
+            readyButton.disabled = true;
+            readyButton.textContent = 'Ready! Waiting...';
+        });
+        
+        // Restart button
+        restartButton.addEventListener('click', function() {
+            socket.emit('restartGame');
+            gameOverScreen.style.display = 'none';
+        });
+        
+        // Keyboard controls with both arrow keys and WASD support
+        document.addEventListener('keydown', function(event) {
+            if (!gameInProgress) return;
+            
+            switch (event.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    socket.emit('move', { direction: 'up' });
+                    event.preventDefault();
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    socket.emit('move', { direction: 'down' });
+                    event.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    socket.emit('move', { direction: 'left' });
+                    event.preventDefault();
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    socket.emit('move', { direction: 'right' });
+                    event.preventDefault();
+                    break;
+                case 'x':
+                case 'X':
+                case ' ':
+                    socket.emit('fire');
+                    event.preventDefault();
+                    break;
+            }
+        });
+        
+        // Mobile controls with both touch and click support for testing
+        const setupMobileControl = (element, action) => {
+            // Touch events
+            element.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                action();
+            });
+            
+            // Click events (for testing on desktop)
+            element.addEventListener('mousedown', action);
+        };
+        
+        setupMobileControl(upButton, () => socket.emit('move', { direction: 'up' }));
+        setupMobileControl(downButton, () => socket.emit('move', { direction: 'down' }));
+        setupMobileControl(leftButton, () => socket.emit('move', { direction: 'left' }));
+        setupMobileControl(rightButton, () => socket.emit('move', { direction: 'right' }));
+        setupMobileControl(mobileFireButton, () => socket.emit('fire'));
+        
+        // Info modal controls
+        infoButton.addEventListener('click', function() {
+            infoModal.style.display = 'flex';
+        });
+        
+        closeModal.addEventListener('click', function() {
+            infoModal.style.display = 'none';
+        });
+        
+        infoModal.addEventListener('click', function(event) {
+            if (event.target === infoModal) {
+                infoModal.style.display = 'none';
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            updateMobileDisplay();
+            handleCanvasResize();
+        });
+    }
+    
+    // Update mobile display based on device
+    function updateMobileDisplay() {
+        isMobile = window.innerWidth <= 768;
+        mobileControls.style.display = isMobile ? 'flex' : 'none';
+    }
+    
+    // Handle canvas resize to maintain aspect ratio
+    function handleCanvasResize() {
+        const gameBoard = document.querySelector('.game-board');
+        const boardWidth = gameBoard.clientWidth;
+        const boardHeight = gameBoard.clientHeight;
+        
+        // Calculate scale factor for rendering
+        canvasScale = boardWidth / gridSize;
+    }
+    
+    // Get color value from color name
+    function getColorValue(colorName) {
+        const namedColors = {
+            'blue': '#0074D9',
+            'purple': '#B10DC9',
+            'orange': '#FF851B',
+            'pink': '#F012BE',
+            'cyan': '#39CCCC',
+            'magenta': '#F92672',
+            'lime': '#01FF70',
+            'indigo': '#4B0082'
+        };
+        
+        return namedColors[colorName] || colorName;
+    }
+    
+    // Draw grid background
+    function drawGrid() {
+        ctx.strokeStyle = 'rgba(76, 201, 240, 0.1)';
+        ctx.lineWidth = 0.5;
+        
+        const gridLines = gridSize / cellSize;
+        
+        // Draw vertical lines
+        for (let i = 0; i <= gridLines; i++) {
+            const x = i * cellSize;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, gridSize);
+            ctx.stroke();
+        }
+        
+        // Draw horizontal lines
+        for (let i = 0; i <= gridLines; i++) {
+            const y = i * cellSize;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(gridSize, y);
+            ctx.stroke();
+        }
+    }
+    
+    // Draw portals with animation
+    function drawPortals(deltaTime) {
+        if (!portals || portals.length !== 2) return;
+        
+        const portalAnimation = (Date.now() / 1000) % (Math.PI * 2);
+        
+        portals.forEach(portal => {
+            ctx.save();
+            
+            // Glow effect
+            ctx.shadowColor = '#7b2cbf';
+            ctx.shadowBlur = 15;
+            
+            // Draw portal circle
+            ctx.fillStyle = '#7b2cbf';
+            ctx.beginPath();
+            ctx.arc(
+                portal.x + cellSize/2, 
+                portal.y + cellSize/2, 
+                cellSize, 0, Math.PI * 2
+            );
+            ctx.fill();
+            
+            // Draw swirl pattern
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            
+            const centerX = portal.x + cellSize/2;
+            const centerY = portal.y + cellSize/2;
+            const radius = cellSize * 0.7;
+            
+            // Animate rotation
+            const spiralRotation = portalAnimation;
+            
+            for (let angle = 0; angle < Math.PI * 4; angle += 0.5) {
+                const spiralRadius = (radius * angle) / (Math.PI * 4);
+                const x = centerX + Math.cos(angle + spiralRotation) * spiralRadius;
+                const y = centerY + Math.sin(angle + spiralRotation) * spiralRadius;
+                
+                if (angle === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+            ctx.restore();
+        });
+    }
+    
+    // Draw food items
+    function drawFood(deltaTime) {
+        // Draw different types of food
+        food.golden.forEach(pos => drawFoodItem(pos, '#ffd700'));
+        food.green.forEach(pos => drawFoodItem(pos, '#00ff7f'));
+        food.red.forEach(pos => drawHeartFood(pos));
+        food.white.forEach(pos => drawBulletFood(pos));
+        food.venom.forEach(pos => drawVenomFood(pos, deltaTime));
+    }
+    
+    // Draw regular food item
+    function drawFoodItem(pos, color) {
+        ctx.save();
+        // Add glow effect
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 5;
+        
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(
+            pos.x + cellSize/2, 
+            pos.y + cellSize/2, 
+            cellSize/2, 0, Math.PI * 2
+        );
+        ctx.fill();
+        ctx.restore();
+    }
+    
+    // Draw heart-shaped food (red)
+    function drawHeartFood(pos) {
+        ctx.save();
+        // Add glow effect
+        ctx.shadowColor = '#ff4d4d';
+        ctx.shadowBlur = 5;
+        
+        ctx.fillStyle = '#ff4d4d';
+        const x = pos.x + cellSize/2;
+        const y = pos.y + cellSize/2;
+        const size = cellSize * 0.8;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y + size/4);
+        
+        // Left curve
+        ctx.bezierCurveTo(
+            x, y, 
+            x - size/2, y - size/2, 
+            x - size/2, y - size/4
+        );
+        
+        ctx.bezierCurveTo(
+            x - size/2, y + size/4, 
+            x, y + size/2, 
+            x, y + size/4
+        );
+        
+        // Right curve
+        ctx.bezierCurveTo(
+            x, y + size/2, 
+            x + size/2, y + size/4, 
+            x + size/2, y - size/4
+        );
+        
+        ctx.bezierCurveTo(
+            x + size/2, y - size/2, 
+            x, y, 
+            x, y + size/4
+        );
+        
+        ctx.fill();
+        ctx.restore();
+    }
+    
+    // Draw bullet food (white)
+    function drawBulletFood(pos) {
+        ctx.save();
+        // Add glow effect
+        ctx.shadowColor = 'white';
+        ctx.shadowBlur = 5;
+        
+        ctx.fillStyle = 'white';
+        const x = pos.x + cellSize/2;
+        const y = pos.y + cellSize/2;
+        const size = cellSize * 0.6;
+        
+        // Draw bullet shape
+        ctx.beginPath();
+        ctx.arc(x, y, size/2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw bullet details
+        ctx.strokeStyle = '#aaa';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x - size/4, y - size/4);
+        ctx.lineTo(x + size/4, y + size/4);
+        ctx.moveTo(x + size/4, y - size/4);
+        ctx.lineTo(x - size/4, y + size/4);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+    
+// Draw venom food (cyan with animation)
+    function drawVenomFood(pos, deltaTime) {
+        ctx.save();
+        // Add glow effect
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 10;
+        
+        const x = pos.x + cellSize/2;
+        const y = pos.y + cellSize/2;
+        const size = cellSize * 0.7;
+        
+        // Animated pulse effect
+        const pulseSize = size * (1 + 0.2 * Math.sin(Date.now() / 200));
+        
+        // Draw venom droplet shape
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.arc(x, y, pulseSize/2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw venom details (skull pattern)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.beginPath();
+        // Small cross/skull pattern
+        const crossSize = pulseSize/3;
+        ctx.rect(x - crossSize/2, y - crossSize/6, crossSize, crossSize/3);
+        ctx.rect(x - crossSize/6, y - crossSize/2, crossSize/3, crossSize);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+    
+    // Draw snakes
+    function drawSnakes() {
+        Object.keys(snakes).forEach(id => {
+            const snake = snakes[id];
+            if (!snake.active || !snake.body || snake.body.length === 0) return;
+            
+            // Draw snake body segments
+            for (let i = 0; i < snake.body.length; i++) {
+                const segment = snake.body[i];
+                
+                // Determine if this is the head segment
+                const isHead = (i === 0);
+                
+                ctx.save();
+                
+                // Apply venom effect if snake has it
+                if (snake.hasVenom) {
+                    ctx.shadowColor = '#00ffff';
+                    ctx.shadowBlur = 10;
+                }
+                
+                // Darker color for head
+                ctx.fillStyle = isHead ? darkenColor(snake.color, 20) : snake.color;
+                
+                // Draw segment
+                ctx.fillRect(segment.x, segment.y, cellSize, cellSize);
+                
+                // Draw eyes on head
+                if (isHead) {
+                    drawSnakeEyes(segment, snake.direction);
+                }
+                
+                ctx.restore();
+            }
+            
+            // Draw bullet if snake has one and is firing
+            if (snake.firingBullet && snake.bulletPosition) {
+                ctx.save();
+                
+                if (snake.venomBullet) {
+                    ctx.fillStyle = '#00ffff';
+                    ctx.shadowColor = '#00ffff';
+                    ctx.shadowBlur = 5; 
+                } else {
+                    ctx.fillStyle = 'white';
+                    ctx.shadowColor = 'white';
+                    ctx.shadowBlur = 5;
+                }
+                // Simple circle for both bullet types
+                ctx.beginPath();
+                ctx.arc(
+                    snake.bulletPosition.x + cellSize/2, 
+                    snake.bulletPosition.y + cellSize/2, 
+                    cellSize/3, 0, Math.PI * 2
+                );
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        });
+    }
+    
+    // Draw snake eyes
+    function drawSnakeEyes(headSegment, direction) {
+        ctx.fillStyle = 'white';
+        const eyeSize = cellSize / 4;
+        const eyeOffset = cellSize / 4;
+        const pupilSize = eyeSize / 2;
+        
+        let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
+        let leftPupilOffsetX = 0, leftPupilOffsetY = 0;
+        let rightPupilOffsetX = 0, rightPupilOffsetY = 0;
+        
+        // Position eyes based on direction
+        switch (direction) {
+            case 'up':
+                leftEyeX = headSegment.x + eyeOffset;
+                leftEyeY = headSegment.y + eyeOffset;
+                rightEyeX = headSegment.x + cellSize - eyeOffset - eyeSize;
+                rightEyeY = headSegment.y + eyeOffset;
+                leftPupilOffsetY = rightPupilOffsetY = -pupilSize/2;
+                break;
+            case 'down':
+                leftEyeX = headSegment.x + eyeOffset;
+                leftEyeY = headSegment.y + cellSize - eyeOffset - eyeSize;
+                rightEyeX = headSegment.x + cellSize - eyeOffset - eyeSize;
+                rightEyeY = headSegment.y + cellSize - eyeOffset - eyeSize;
+                leftPupilOffsetY = rightPupilOffsetY = pupilSize/2;
+                break;
+            case 'left':
+                leftEyeX = headSegment.x + eyeOffset;
+                leftEyeY = headSegment.y + eyeOffset;
+                rightEyeX = headSegment.x + eyeOffset;
+                rightEyeY = headSegment.y + cellSize - eyeOffset - eyeSize;
+                leftPupilOffsetX = rightPupilOffsetX = -pupilSize/2;
+                break;
+            case 'right':
+                leftEyeX = headSegment.x + cellSize - eyeOffset - eyeSize;
+                leftEyeY = headSegment.y + eyeOffset;
+                rightEyeX = headSegment.x + cellSize - eyeOffset - eyeSize;
+                rightEyeY = headSegment.y + cellSize - eyeOffset - eyeSize;
+                leftPupilOffsetX = rightPupilOffsetX = pupilSize/2;
+                break;
+        }
+        
+        // Draw eye whites
+        ctx.fillStyle = 'white';
+        ctx.fillRect(leftEyeX, leftEyeY, eyeSize, eyeSize);
+        ctx.fillRect(rightEyeX, rightEyeY, eyeSize, eyeSize);
+        
+        // Draw pupils
+        ctx.fillStyle = 'black';
+        ctx.fillRect(
+            leftEyeX + eyeSize/2 - pupilSize/2 + leftPupilOffsetX, 
+            leftEyeY + eyeSize/2 - pupilSize/2 + leftPupilOffsetY, 
+            pupilSize, pupilSize
+        );
+        ctx.fillRect(
+            rightEyeX + eyeSize/2 - pupilSize/2 + rightPupilOffsetX, 
+            rightEyeY + eyeSize/2 - pupilSize/2 + rightPupilOffsetY, 
+            pupilSize, pupilSize
+        );
+    }
+    
+    // Utility function to darken a color
+    function darkenColor(color, percent) {
+        // Convert color to RGB
+        let r, g, b;
+        
+        // Handle named colors
+        const namedColors = {
+            'blue': '#0074D9',
+            'purple': '#B10DC9',
+            'orange': '#FF851B',
+            'pink': '#F012BE',
+            'cyan': '#39CCCC',
+            'magenta': '#F92672',
+            'lime': '#01FF70',
+            'indigo': '#4B0082'
+        };
+        
+        if (namedColors[color]) {
+            color = namedColors[color];
+        }
+        
+        // Handle hex colors
+        if (color.startsWith('#')) {
+            const hex = color.substring(1);
+            r = parseInt(hex.substr(0, 2), 16);
+            g = parseInt(hex.substr(2, 2), 16);
+            b = parseInt(hex.substr(4, 2), 16);
+        } 
+        // Handle rgb colors
+        else if (color.startsWith('rgb')) {
+            const values = color.match(/\d+/g);
+            r = parseInt(values[0]);
+            g = parseInt(values[1]);
+            b = parseInt(values[2]);
+        }
+        // Default to black if conversion fails
+        else {
+            return '#000000';
+        }
+        
+        // Darken
+        r = Math.max(0, Math.floor(r * (100 - percent) / 100));
+        g = Math.max(0, Math.floor(g * (100 - percent) / 100));
+        b = Math.max(0, Math.floor(b * (100 - percent) / 100));
+        
+        // Convert back to hex
+        return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    
+    // Update waiting players display
+    function updateWaitingPlayers(players) {
+        if (!players) return;
+        
+        waitingPlayers.innerHTML = '';
+        
+        if (Object.keys(players).length === 0) {
+            waitingText.textContent = 'Waiting for players to join...';
+            return;
+        }
+        
+        let readyCount = 0;
+        let totalPlayers = Object.keys(players).length;
+        
+        Object.keys(players).forEach(id => {
+            const player = players[id];
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'player-info';
+            
+            const colorSpan = document.createElement('span');
+            colorSpan.className = 'player-color';
+            colorSpan.style.backgroundColor = getColorValue(player.color);
+            
+            const statusText = player.readyToPlay ? 'Ready' : 'Not Ready';
+            
+            playerDiv.appendChild(colorSpan);
+            playerDiv.appendChild(document.createTextNode(statusText));
+            
+            waitingPlayers.appendChild(playerDiv);
+            
+            if (player.readyToPlay) {
+                readyCount++;
+            }
+        });
+        
+        waitingText.textContent = `Players ready: ${readyCount}/${totalPlayers}`;
+        
+        if (readyCount > 0 && totalPlayers === 1) {
+            waitingText.textContent += ' (Need at least 2 players)';
+        } else if (selectedColor) {
+            // Show instructional text if player has selected a color but not ready
+            const thisPlayer = Object.values(players).find(p => p.color === selectedColor);
+            if (thisPlayer && !thisPlayer.readyToPlay) {
+                readyButton.textContent = 'Click to Ready Up!';
+                readyButton.style.animation = 'pulse 1.5s infinite';
+            }
+        }
+    }
+    
+    // Update player info display
+    function updatePlayerInfo() {
+        snakeInfo.innerHTML = '';
+        
+        Object.keys(snakes).forEach(id => {
+            const snake = snakes[id];
+            if (!snake.active || !snake.body || snake.body.length === 0) return;
+            
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'player-info';
+            
+            const colorSpan = document.createElement('span');
+            colorSpan.className = 'player-color';
+            colorSpan.style.backgroundColor = getColorValue(snake.color);
+            
+            const livesContainer = document.createElement('div');
+            livesContainer.className = 'lives-container';
+            
+            for (let i = 0; i < snake.lives; i++) {
+                const lifeIcon = document.createElement('span');
+                lifeIcon.className = 'life-icon';
+                lifeIcon.textContent = '♥';
+                livesContainer.appendChild(lifeIcon);
+            }
+            
+            playerDiv.appendChild(colorSpan);
+            playerDiv.appendChild(document.createTextNode(`${snake.color}`));
+            playerDiv.appendChild(livesContainer);
+            
+            // Show bullet status
+            if (snake.hasBullet) {
+                const bulletIcon = document.createElement('span');
+                
+                // Special icon for venom bullet potential
+                if (snake.hasVenom) {
+                    bulletIcon.textContent = ' 🔫☠️';
+                    bulletIcon.title = 'Venom Bullet Ready';
+                    bulletIcon.style.color = '#00ffff';
+                } else {
+                    bulletIcon.textContent = ' 🔫';
+                    bulletIcon.title = 'Bullet Ready';
+                }
+                
+                playerDiv.appendChild(bulletIcon);
+            }
+            
+            // Show venom status
+            else if (snake.hasVenom) {
+                const venomIcon = document.createElement('span');
+                venomIcon.textContent = ' ☠️';
+                venomIcon.style.color = '#00ffff';
+                venomIcon.title = 'Venom Active';
+                playerDiv.appendChild(venomIcon);
+            }
+            
+            snakeInfo.appendChild(playerDiv);
+        });
+    }
+  
+// Socket event handlers
+    socket.on('connect', function() {
+        console.log('Connected to server');
+    });
+    
+    socket.on('gameState', function(state) {
+        console.log('Received game state:', state);
+        gameInProgress = state.inProgress;
+        gridSize = state.gridSize;
+        
+        // Reset canvas if grid size changed
+        if (canvas.width !== gridSize || canvas.height !== gridSize) {
+            canvas.width = gridSize;
+            canvas.height = gridSize;
+            handleCanvasResize();
+        }
+        
+        if (gameInProgress) {
+            lobbyScreen.style.display = 'none';
+        } else {
+            lobbyScreen.style.display = 'flex';
+            gameOverScreen.style.display = 'none';
+            updateWaitingPlayers(state.waitingPlayers);
+        }
+    });
+    
+    socket.on('availableColorsUpdate', function(colors) {
+        console.log('Received available colors:', colors);
+        
+        // Clear color selection
+        colorSelection.innerHTML = '';
+        
+        // Add color options
+        colors.forEach(color => {
+            const colorOption = document.createElement('div');
+            colorOption.className = `color-option ${color}`;
+            colorOption.dataset.color = color;
+            colorOption.style.backgroundColor = getColorValue(color); // Apply the color directly
+            
+            colorOption.addEventListener('click', function() {
+                console.log('Selected color:', color);
+                socket.emit('selectColor', color);
+                selectedColor = color;
+                
+                // Update selection UI
+                document.querySelectorAll('.color-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                colorOption.classList.add('selected');
+                
+                // Enable ready button
+                readyButton.disabled = false;
+            });
+            
+            colorSelection.appendChild(colorOption);
+        });
+    });
+    
+    socket.on('waitingPlayersUpdate', function(players) {
+        console.log('Waiting players update:', players);
+        updateWaitingPlayers(players);
+    });
+    
+    socket.on('gameStarted', function() {
+        console.log('Game started');
+        gameInProgress = true;
+        lobbyScreen.style.display = 'none';
+        gameOverScreen.style.display = 'none';
+    });
+    
+    socket.on('updatePlayers', function(updatedSnakes) {
+        snakes = updatedSnakes;
+        updatePlayerInfo();
+    });
+    
+    socket.on('updateFood', function(updatedFood) {
+        food = updatedFood;
+    });
+    
+    socket.on('updatePortals', function(updatedPortals) {
+        portals = updatedPortals;
+    });
+    
+    socket.on('gameOver', function(data) {
+        console.log('Game over, winner:', data.winner);
+        gameInProgress = false;
+        gameOverScreen.style.display = 'flex';
+        
+        if (data.winner === 'No') {
+            winnerText.textContent = 'No winner - It\'s a draw!';
+        } else {
+            winnerText.textContent = `Winner: ${data.winner} Snake`;
+        }
+    });
+    
+    socket.on('gridSizeUpdate', function(size) {
+        console.log('Grid size update:', size);
+        gridSize = size;
+        canvas.width = gridSize;
+        canvas.height = gridSize;
+        handleCanvasResize();
+    });
+    
+    socket.on('returnToLobby', function() {
+        console.log('Returning to lobby');
+        gameInProgress = false;
+        lobbyScreen.style.display = 'flex';
+        gameOverScreen.style.display = 'none';
+        
+        // Reset selected color
+        selectedColor = null;
+        readyButton.disabled = true;
+        readyButton.textContent = 'Ready to Play';
+        readyButton.style.animation = '';
+    });
+    
+    // Handle errors and reconnection
+    socket.on('connect_error', function(error) {
+        console.error('Connection error:', error);
+    });
+    
+    socket.on('reconnect', function(attemptNumber) {
+        console.log('Reconnected after', attemptNumber, 'attempts');
+    });
+    
+    // Initialize the game when page loads
+    window.addEventListener('load', function() {
+        console.log('Window loaded, initializing game...');
+        initGame();
+        handleCanvasResize();
+    });
+</script>
+
